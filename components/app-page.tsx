@@ -3,7 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { transcribeYouTube } from "@/lib/actions";
+import { downloadYoutube, transcribe } from "@/lib/actions";
 import { Loader2 } from "lucide-react";
 import React, { useState } from "react";
 
@@ -21,12 +21,13 @@ export function TranscribePage() {
 
     try {
       console.log("url", url);
-      const result = await transcribeYouTube(url);
+      const result = await downloadYoutube(url);
       if ("error" in result) {
-        setError(result.error);
-      } else {
-        setTranscription(result.transcription);
+        return setError(result.error!);
       }
+
+      const transcriptionResult = await transcribe(data, result.fileName);
+      setTranscription(transcriptionResult.transcription);
     } catch (error) {
       setError("An error occurred during transcription: " + error);
     } finally {
