@@ -20,13 +20,12 @@ export function TranscribePage() {
     setTranscription("");
 
     try {
-      console.log("url", url);
       const result = await downloadYoutube(url);
       if ("error" in result) {
         return setError(result.error!);
       }
 
-      const transcriptionResult = await transcribe(data, result.fileName);
+      const transcriptionResult = await transcribe(result.filePath);
       setTranscription(transcriptionResult.transcription);
     } catch (error) {
       setError("An error occurred during transcription: " + error);
