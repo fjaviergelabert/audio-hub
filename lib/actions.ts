@@ -1,12 +1,13 @@
 "use server";
 
+import PipelineSingleton from "@/lib/pipeline";
 import ytdl from "@distube/ytdl-core";
 import { path } from "@ffmpeg-installer/ffmpeg";
-import { pipeline } from "@xenova/transformers";
 import fs, { promises as fsPromises } from "fs";
-import { WaveFile } from "wavefile";
 
+import { AutomaticSpeechRecognitionPipelineType } from "@xenova/transformers";
 import ffmpeg from "fluent-ffmpeg";
+import { WaveFile } from "wavefile";
 
 ffmpeg.setFfmpegPath(path);
 
@@ -49,7 +50,6 @@ export async function transcribe(filePath: string) {
     wav.toBitDepth("32f");
     wav.toSampleRate(16000);
     let audioData = wav.getSamples();
-
     if (Array.isArray(audioData)) {
       if (audioData.length > 1) {
         const SCALING_FACTOR = Math.sqrt(2);
@@ -61,21 +61,25 @@ export async function transcribe(filePath: string) {
       audioData = audioData[0]; // Use the first channel
     }
 
-    // ? https://huggingface.co/docs/transformers.js/v2.17.2/en/guides/node-audio-processing
+    const transcriber: AutomaticSpeechRecognitionPipelineType =
+      await PipelineSingleton.getInstance();
 
-    const transcriber = await pipeline(
-      "automatic-speech-recognition",
-      "Xenova/whisper-tiny.en"
-    );
     const output = await transcriber(audioData, {
-      language: "english",
+      top_k: 0,
+      do_sample: false,
+      // language: "spanish",
       task: "transcribe",
       chunk_length_s: 30,
       stride_length_s: 5,
-      // return_timestamps: true,
+      return_timestamps: true,
+      chunk_callback: (...args) => {
+        console.log("chunk", ...args);
+      },
+      // force_full_sequences: false,
+      // threshold: 0.5,
     });
 
-    return { transcription: output?.text };
+    return { transcription: output };
   } catch (error) {
     console.trace(error);
     return { error: "An error occurred during transcription" };
@@ -89,16 +93,9 @@ export async function transcribe(filePath: string) {
 export async function convertMp3ToWav(
   mp3FilePath: string,
   outputWavPath: string
-  // sampleRate: number = 16000
 ) {
   return new Promise((resolve, reject) => {
     ffmpeg(mp3FilePath)
-      // .audioChannels(1) // Convert to mono if needed
-      // .audioFrequency(sampleRate)
-      // .addOutputOptions([
-      //   "-acodec pcm_f32le", // Set audio codec to 32-bit floating point PCM
-      //   "-ar 16000", // Sample rate to 16 kHz
-      // ])
       .toFormat("wav")
       .on("end", () => {
         resolve({ success: true, outputFilePath: outputWavPath });

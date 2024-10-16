@@ -26,7 +26,9 @@ export function TranscribePage() {
       }
 
       const transcriptionResult = await transcribe(result.filePath);
-      setTranscription(transcriptionResult.transcription);
+
+      console.log("transcriptionResult", transcriptionResult);
+      setTranscription(transcriptionResult.transcription.text);
     } catch (error) {
       setError("An error occurred during transcription: " + error);
     } finally {
