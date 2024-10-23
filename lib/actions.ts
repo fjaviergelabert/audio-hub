@@ -64,19 +64,86 @@ export async function transcribe(filePath: string) {
     const transcriber: AutomaticSpeechRecognitionPipelineType =
       await PipelineSingleton.getInstance();
 
+    const time_precision =
+      transcriber.processor.feature_extractor.config.chunk_length /
+      transcriber.model.config.max_source_positions;
+
+    // Storage for chunks to be processed. Initialise with an empty chunk.
+    const chunks_to_process = [
+      {
+        tokens: [],
+        finalised: false,
+      },
+    ];
+
+    // TODO: Storage for fully-processed and merged chunks
+    // let decoded_chunks = [];
+
+    function chunk_callback(chunk) {
+      const last = chunks_to_process[chunks_to_process.length - 1];
+
+      // Overwrite last chunk with new info
+      Object.assign(last, chunk);
+      last.finalised = true;
+
+      // Create an empty chunk after, if it not the last chunk
+      if (!chunk.is_last) {
+        chunks_to_process.push({
+          tokens: [],
+          finalised: false,
+        });
+      }
+
+      let data = transcriber.tokenizer._decode_asr(chunks_to_process, {
+        time_precision: time_precision,
+        return_timestamps: true,
+        force_full_sequences: false,
+      });
+
+      console.clear();
+      console.log("data", data[0]);
+    }
+
+    // Inject custom callback function to handle merging of chunks
+    function callback_function(item) {
+      // let last = chunks_to_process[chunks_to_process.length - 1];
+      // // Update tokens of last chunk
+      // last.tokens = [...item[0].output_token_ids];
+      // // Merge text chunks
+      // // TODO optimise so we don't have to decode all chunks every time
+      // let data = transcriber.tokenizer._decode_asr(chunks_to_process, {
+      //   time_precision: time_precision,
+      //   return_timestamps: true,
+      //   force_full_sequences: false,
+      // });
+      // console.clear();
+      // console.log("data", data[0]);
+    }
+
+    // Actually run transcription
     const output = await transcriber(audioData, {
+      // Greedy
       top_k: 0,
       do_sample: false,
-      // language: "spanish",
-      task: "transcribe",
+
+      // Sliding window
       chunk_length_s: 30,
       stride_length_s: 5,
+
+      // Language and task
+      // language: language,
+      task: "transcribe",
+
+      // Return timestamps
       return_timestamps: true,
-      chunk_callback: (...args) => {
-        console.log("chunk", ...args);
-      },
-      // force_full_sequences: false,
-      // threshold: 0.5,
+      force_full_sequences: false,
+
+      // Callback functions
+      callback_function: callback_function, // after each generation step
+      chunk_callback: chunk_callback, // after each chunk is processed
+    }).catch((error) => {
+      console.log("error", error);
+      return null;
     });
 
     return { transcription: output };
