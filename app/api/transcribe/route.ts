@@ -1,4 +1,4 @@
-import { transcribe } from "@/lib/actions";
+import { transcribe } from "@/app/api/transcribe/transcribe";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(req: NextRequest) {

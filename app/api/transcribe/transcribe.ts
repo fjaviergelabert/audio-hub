@@ -1,5 +1,3 @@
-"use server";
-
 import PipelineSingleton from "@/lib/pipeline";
 import ytdl from "@distube/ytdl-core";
 import { path } from "@ffmpeg-installer/ffmpeg";
@@ -39,34 +37,33 @@ export async function transcribe(url: string, onProgress: (data: any) => void) {
 
     const chunks_to_process = [{ tokens: [], finalised: false }];
 
-    function chunk_callback(chunk) {
-      const last = chunks_to_process[chunks_to_process.length - 1];
-      Object.assign(last, chunk);
-      last.finalised = true;
-
-      if (!chunk.is_last) {
-        chunks_to_process.push({ tokens: [], finalised: false });
-      }
-
-      let data = transcriber.tokenizer._decode_asr(chunks_to_process, {
-        time_precision,
-        return_timestamps: true,
-        force_full_sequences: false,
-      });
-
-      console.log("trasncription-chunk", data);
-      onProgress(data[0]);
-    }
-
     await transcriber(audioData, {
       top_k: 0,
       do_sample: false,
       chunk_length_s: 30,
       stride_length_s: 5,
       task: "transcribe",
+      language: "auto",
       return_timestamps: true,
       force_full_sequences: false,
-      chunk_callback,
+      chunk_callback: (chunk) => {
+        const last = chunks_to_process[chunks_to_process.length - 1];
+        Object.assign(last, chunk);
+        last.finalised = true;
+
+        if (!chunk.is_last) {
+          chunks_to_process.push({ tokens: [], finalised: false });
+        }
+
+        const data = transcriber.tokenizer._decode_asr(chunks_to_process, {
+          time_precision,
+          return_timestamps: true,
+          force_full_sequences: false,
+        });
+
+        console.log("trasncription-chunk", data);
+        onProgress(data[0]);
+      },
     });
   } catch (error) {
     throw error;
