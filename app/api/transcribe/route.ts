@@ -9,11 +9,11 @@ export async function POST(req: NextRequest) {
     async start(controller) {
       try {
         await transcribe(url, (data) => {
-          controller.enqueue(`data: ${JSON.stringify(data)}\n\n`);
+          controller.enqueue(data);
         });
         controller.close(); // Close stream when done
       } catch (error) {
-        controller.enqueue(`data: ${JSON.stringify({ error })}\n\n`);
+        controller.error(error);
         controller.close(); // Ensure stream is closed on error
       }
     },

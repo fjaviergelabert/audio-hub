@@ -53,17 +53,8 @@ export function TranscribePage() {
                 return;
               }
 
-              const chunk = decoder.decode(value, { stream: true });
-              const lines = chunk.split("\n");
-
-              lines.forEach((line) => {
-                if (line.startsWith("data: ")) {
-                  const data = JSON.parse(line.slice(6));
-                  console.log("Progress update:", data);
-                  // Optionally update your UI with the data
-                  setTranscription(data);
-                }
-              });
+              const data = decoder.decode(value, { stream: true });
+              setTranscription(data);
 
               controller.enqueue(value);
               push(); // Continue reading

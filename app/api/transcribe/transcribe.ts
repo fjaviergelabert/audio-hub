@@ -31,10 +31,6 @@ export async function transcribe(url: string, onProgress: (data: any) => void) {
 
     const transcriber = await PipelineSingleton.getInstance();
 
-    const time_precision =
-      transcriber.processor.feature_extractor.config.chunk_length /
-      transcriber.model.config.max_source_positions;
-
     const chunks_to_process = [{ tokens: [], finalised: false }];
 
     await transcriber(audioData, {
@@ -43,7 +39,6 @@ export async function transcribe(url: string, onProgress: (data: any) => void) {
       chunk_length_s: 30,
       stride_length_s: 5,
       task: "transcribe",
-      language: "auto",
       return_timestamps: true,
       force_full_sequences: false,
       chunk_callback: (chunk) => {
@@ -54,14 +49,19 @@ export async function transcribe(url: string, onProgress: (data: any) => void) {
         if (!chunk.is_last) {
           chunks_to_process.push({ tokens: [], finalised: false });
         }
+      },
+      callback_function: (item) => {
+        const last = chunks_to_process[chunks_to_process.length - 1];
+        last.tokens = [...item[0].output_token_ids];
 
         const data = transcriber.tokenizer._decode_asr(chunks_to_process, {
-          time_precision,
+          time_precision:
+            transcriber.processor.feature_extractor.config.chunk_length /
+            transcriber.model.config.max_source_positions,
           return_timestamps: true,
           force_full_sequences: false,
         });
 
-        console.log("trasncription-chunk", data);
         onProgress(data[0]);
       },
     });
