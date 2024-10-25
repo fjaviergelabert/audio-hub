@@ -3,7 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { downloadYoutube, transcribe } from "@/lib/actions";
+import { downloadYoutube } from "@/lib/actions";
 import { Loader2 } from "lucide-react";
 import React, { useState } from "react";
 
@@ -25,16 +25,76 @@ export function TranscribePage() {
         return setError(result.error!);
       }
 
-      const transcriptionResult = await transcribe(result.filePath);
-
-      console.log("transcriptionResult", transcriptionResult);
-      setTranscription(transcriptionResult.transcription.text);
+      await startTranscription(result.filePath);
     } catch (error) {
       setError("An error occurred during transcription: " + error);
-    } finally {
       setLoading(false);
     }
   };
+
+  async function startTranscription(filePath: string) {
+    const response = await fetch("/api/transcribe", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ filePath }),
+    });
+
+    if (!response.ok) {
+      console.error("Failed to start transcription");
+      return;
+    }
+
+    const reader = response.body!.getReader();
+    const decoder = new TextDecoder("utf-8");
+
+    // Create a readable stream that processes the incoming data chunks
+    const stream = new ReadableStream({
+      start(controller) {
+        function push() {
+          reader
+            .read()
+            .then(({ done, value }) => {
+              if (done) {
+                controller.close();
+                return;
+              }
+
+              const chunk = decoder.decode(value, { stream: true });
+              const lines = chunk.split("\n");
+
+              lines.forEach((line) => {
+                if (line.startsWith("data: ")) {
+                  const data = JSON.parse(line.slice(6));
+                  console.log("Progress update:", data);
+                  // Optionally update your UI with the data
+                  setTranscription(data);
+                }
+              });
+
+              controller.enqueue(value);
+              push(); // Continue reading
+            })
+            .catch((error) => {
+              console.error("Stream reading error:", error);
+              controller.error(error);
+            });
+        }
+
+        push(); // Start reading
+      },
+    });
+
+    // You can consume the stream if needed, or just let it run
+    new Response(stream)
+      .text()
+      .then((result) => {
+        setLoading(false);
+        console.log("Final result:", result);
+      })
+      .catch((error) => {
+        console.error("Error processing stream:", error);
+      });
+  }
 
   return (
     <div className="min-h-screen bg-gray-100 py-12 px-4 sm:px-6 lg:px-8">

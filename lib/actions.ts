@@ -5,7 +5,6 @@ import ytdl from "@distube/ytdl-core";
 import { path } from "@ffmpeg-installer/ffmpeg";
 import fs, { promises as fsPromises } from "fs";
 
-import { AutomaticSpeechRecognitionPipelineType } from "@xenova/transformers";
 import ffmpeg from "fluent-ffmpeg";
 import { WaveFile } from "wavefile";
 
@@ -38,13 +37,16 @@ export async function downloadYoutube(url: string) {
   }
 }
 
-export async function transcribe(filePath: string) {
-  const wavFilePath = filePath.replace(/\.[^/.]+$/, ".wav"); // Replace any extension with .wav
+export async function transcribe(
+  filePath: string,
+  onProgress: (data: any) => void
+) {
+  const wavFilePath = filePath.replace(/\.[^/.]+$/, ".wav");
 
   try {
     await convertMp3ToWav(filePath, wavFilePath);
 
-    const wavFileBuffer = await fsPromises.readFile(wavFilePath); // Read WAV file into a buffer
+    const wavFileBuffer = await fsPromises.readFile(wavFilePath);
     const wav = new WaveFile(wavFileBuffer);
 
     wav.toBitDepth("32f");
@@ -58,98 +60,48 @@ export async function transcribe(filePath: string) {
             (SCALING_FACTOR * (audioData[0][i] + audioData[1][i])) / 2;
         }
       }
-      audioData = audioData[0]; // Use the first channel
+      audioData = audioData[0];
     }
 
-    const transcriber: AutomaticSpeechRecognitionPipelineType =
-      await PipelineSingleton.getInstance();
+    const transcriber = await PipelineSingleton.getInstance();
 
     const time_precision =
       transcriber.processor.feature_extractor.config.chunk_length /
       transcriber.model.config.max_source_positions;
 
-    // Storage for chunks to be processed. Initialise with an empty chunk.
-    const chunks_to_process = [
-      {
-        tokens: [],
-        finalised: false,
-      },
-    ];
-
-    // TODO: Storage for fully-processed and merged chunks
-    // let decoded_chunks = [];
+    const chunks_to_process = [{ tokens: [], finalised: false }];
 
     function chunk_callback(chunk) {
       const last = chunks_to_process[chunks_to_process.length - 1];
-
-      // Overwrite last chunk with new info
       Object.assign(last, chunk);
       last.finalised = true;
 
-      // Create an empty chunk after, if it not the last chunk
       if (!chunk.is_last) {
-        chunks_to_process.push({
-          tokens: [],
-          finalised: false,
-        });
+        chunks_to_process.push({ tokens: [], finalised: false });
       }
 
       let data = transcriber.tokenizer._decode_asr(chunks_to_process, {
-        time_precision: time_precision,
+        time_precision,
         return_timestamps: true,
         force_full_sequences: false,
       });
 
-      console.clear();
-      console.log("data", data[0]);
+      console.log("data", data);
+      onProgress(data[0]); // Stream progress
     }
 
-    // Inject custom callback function to handle merging of chunks
-    function callback_function(item) {
-      // let last = chunks_to_process[chunks_to_process.length - 1];
-      // // Update tokens of last chunk
-      // last.tokens = [...item[0].output_token_ids];
-      // // Merge text chunks
-      // // TODO optimise so we don't have to decode all chunks every time
-      // let data = transcriber.tokenizer._decode_asr(chunks_to_process, {
-      //   time_precision: time_precision,
-      //   return_timestamps: true,
-      //   force_full_sequences: false,
-      // });
-      // console.clear();
-      // console.log("data", data[0]);
-    }
-
-    // Actually run transcription
-    const output = await transcriber(audioData, {
-      // Greedy
+    await transcriber(audioData, {
       top_k: 0,
       do_sample: false,
-
-      // Sliding window
       chunk_length_s: 30,
       stride_length_s: 5,
-
-      // Language and task
-      // language: language,
       task: "transcribe",
-
-      // Return timestamps
       return_timestamps: true,
       force_full_sequences: false,
-
-      // Callback functions
-      callback_function: callback_function, // after each generation step
-      chunk_callback: chunk_callback, // after each chunk is processed
-    }).catch((error) => {
-      console.log("error", error);
-      return null;
+      chunk_callback,
     });
-
-    return { transcription: output };
   } catch (error) {
-    console.trace(error);
-    return { error: "An error occurred during transcription" };
+    throw error;
   } finally {
     setTimeout(() => {
       fs.unlinkSync(wavFilePath);
