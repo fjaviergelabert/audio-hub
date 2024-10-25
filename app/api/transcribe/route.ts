@@ -2,13 +2,13 @@ import { transcribe } from "@/lib/actions";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(req: NextRequest) {
-  const { filePath } = await req.json();
+  const { url } = await req.json();
 
   // Make sure to use the ReadableStream to send back a streaming response
   const stream = new ReadableStream({
     async start(controller) {
       try {
-        await transcribe(filePath, (data) => {
+        await transcribe(url, (data) => {
           controller.enqueue(`data: ${JSON.stringify(data)}\n\n`);
         });
         controller.close(); // Close stream when done

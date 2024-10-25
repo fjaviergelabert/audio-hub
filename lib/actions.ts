@@ -3,51 +3,19 @@
 import PipelineSingleton from "@/lib/pipeline";
 import ytdl from "@distube/ytdl-core";
 import { path } from "@ffmpeg-installer/ffmpeg";
-import fs, { promises as fsPromises } from "fs";
 
 import ffmpeg from "fluent-ffmpeg";
+import { PassThrough } from "stream";
 import { WaveFile } from "wavefile";
 
 ffmpeg.setFfmpegPath(path);
 
-export async function downloadYoutube(url: string) {
-  const FILE_NAME = "audio";
-  const fileName = FILE_NAME + "-" + Date.now() + ".mp4";
-  const filePath = `./public/${fileName}`;
-  let audioFile: fs.WriteStream;
+export async function transcribe(url: string, onProgress: (data: any) => void) {
   try {
-    audioFile = fs.createWriteStream(filePath);
+    const mp3Buffer = await downloadYoutube(url);
+    const wavBuffer = await convertMp3ToWav(mp3Buffer);
 
-    const audioStream = ytdl(url, { filter: "audioonly" });
-    await new Promise((resolve, reject) => {
-      audioStream.pipe(audioFile);
-      audioStream.on("end", resolve);
-      audioStream.on("error", reject);
-    });
-
-    return { success: true, filePath, fileName };
-  } catch (error) {
-    console.error(error);
-    return { error: "An error occurred during audio download" };
-  } finally {
-    audioFile!.close();
-    setTimeout(() => {
-      fs.unlinkSync(filePath);
-    }, 30000);
-  }
-}
-
-export async function transcribe(
-  filePath: string,
-  onProgress: (data: any) => void
-) {
-  const wavFilePath = filePath.replace(/\.[^/.]+$/, ".wav");
-
-  try {
-    await convertMp3ToWav(filePath, wavFilePath);
-
-    const wavFileBuffer = await fsPromises.readFile(wavFilePath);
-    const wav = new WaveFile(wavFileBuffer);
+    const wav = new WaveFile(wavBuffer);
 
     wav.toBitDepth("32f");
     wav.toSampleRate(16000);
@@ -86,8 +54,8 @@ export async function transcribe(
         force_full_sequences: false,
       });
 
-      console.log("data", data);
-      onProgress(data[0]); // Stream progress
+      console.log("trasncription-chunk", data);
+      onProgress(data[0]);
     }
 
     await transcriber(audioData, {
@@ -102,29 +70,35 @@ export async function transcribe(
     });
   } catch (error) {
     throw error;
-  } finally {
-    setTimeout(() => {
-      fs.unlinkSync(wavFilePath);
-    }, 30000);
   }
 }
 
-export async function convertMp3ToWav(
-  mp3FilePath: string,
-  outputWavPath: string
-) {
+async function downloadYoutube(url: string): Promise<Buffer> {
   return new Promise((resolve, reject) => {
-    ffmpeg(mp3FilePath)
+    const dataChunks: Buffer[] = [];
+
+    const audioStream = ytdl(url, { filter: "audioonly" });
+    audioStream.on("data", (chunk) => dataChunks.push(chunk));
+    audioStream.on("end", () => resolve(Buffer.concat(dataChunks)));
+    audioStream.on("error", reject);
+  });
+}
+
+async function convertMp3ToWav(mp3Buffer: Buffer): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    const inputStream = new PassThrough();
+    const outputStream = new PassThrough();
+    const chunks: Buffer[] = [];
+
+    inputStream.end(mp3Buffer);
+
+    ffmpeg(inputStream)
       .toFormat("wav")
-      .on("end", () => {
-        resolve({ success: true, outputFilePath: outputWavPath });
-      })
-      .on("error", (error) => {
-        reject({
-          error: "An error occurred during conversion",
-          details: error.message,
-        });
-      })
-      .save(outputWavPath);
+      .on("error", (err) => reject(err))
+      .pipe(outputStream);
+
+    outputStream.on("data", (chunk) => chunks.push(chunk));
+    outputStream.on("end", () => resolve(Buffer.concat(chunks)));
+    outputStream.on("error", reject);
   });
 }
