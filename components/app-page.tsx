@@ -35,13 +35,13 @@ export function TranscribePage() {
 
     if (!response.ok) {
       console.error("Failed to start transcription");
+      setLoading(false);
       return;
     }
 
     const reader = response.body!.getReader();
     const decoder = new TextDecoder("utf-8");
 
-    // Create a readable stream that processes the incoming data chunks
     const stream = new ReadableStream({
       start(controller) {
         function push() {
@@ -50,26 +50,43 @@ export function TranscribePage() {
             .then(({ done, value }) => {
               if (done) {
                 controller.close();
+                setLoading(false);
                 return;
               }
 
               const data = decoder.decode(value, { stream: true });
-              setTranscription(data);
+              data
+                .split("\n")
+                .filter(Boolean)
+                .forEach((line) => {
+                  try {
+                    const progressUpdate = JSON.parse(line);
+                    console.log("PROGRESS", progressUpdate);
+                    if (
+                      progressUpdate.type === "transcription" &&
+                      progressUpdate.data
+                    ) {
+                      setTranscription(progressUpdate.data);
+                    }
+                  } catch (e) {
+                    console.error("Error parsing progress update:", e);
+                  }
+                });
 
               controller.enqueue(value);
-              push(); // Continue reading
+              push();
             })
             .catch((error) => {
               console.error("Stream reading error:", error);
               controller.error(error);
+              setLoading(false);
             });
         }
 
-        push(); // Start reading
+        push();
       },
     });
 
-    // You can consume the stream if needed, or just let it run
     new Response(stream)
       .text()
       .then((result) => {
@@ -78,6 +95,7 @@ export function TranscribePage() {
       })
       .catch((error) => {
         console.error("Error processing stream:", error);
+        setLoading(false);
       });
   }
 

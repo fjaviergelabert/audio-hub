@@ -3,7 +3,8 @@ import ytdl from "@distube/ytdl-core";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(req: NextRequest) {
-  const url = req.nextUrl.searchParams.get("url");
+  const { url } = await req.json();
+  // const url = req.nextUrl.searchParams.get("url");
   if (!url || !ytdl.validateURL(url)) {
     return new NextResponse("Invalid or missing URL parameter", {
       status: 400,
@@ -14,10 +15,10 @@ export async function POST(req: NextRequest) {
     const stream = new ReadableStream({
       async start(controller) {
         try {
-          await transcribe(url, (data) => {
-            controller.enqueue(data);
+          await transcribe(url, (progress) => {
+            controller.enqueue(JSON.stringify(progress) + "\n");
           });
-          controller.close(); // Close stream when done
+          controller.close();
         } catch (error) {
           console.error("Error during transcription:", error);
           controller.error("Failed to transcribe audio");
