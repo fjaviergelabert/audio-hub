@@ -1,29 +1,40 @@
 import { transcribe } from "@/app/api/transcribe/transcribe";
+import ytdl from "@distube/ytdl-core";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(req: NextRequest) {
-  const { url } = await req.json();
+  const url = req.nextUrl.searchParams.get("url");
+  if (!url || !ytdl.validateURL(url)) {
+    return new NextResponse("Invalid or missing URL parameter", {
+      status: 400,
+    });
+  }
 
-  // Make sure to use the ReadableStream to send back a streaming response
-  const stream = new ReadableStream({
-    async start(controller) {
-      try {
-        await transcribe(url, (data) => {
-          controller.enqueue(data);
-        });
-        controller.close(); // Close stream when done
-      } catch (error) {
-        controller.error(error);
-        controller.close(); // Ensure stream is closed on error
-      }
-    },
-  });
+  try {
+    const stream = new ReadableStream({
+      async start(controller) {
+        try {
+          await transcribe(url, (data) => {
+            controller.enqueue(data);
+          });
+          controller.close(); // Close stream when done
+        } catch (error) {
+          console.error("Error during transcription:", error);
+          controller.error("Failed to transcribe audio");
+          controller.close();
+        }
+      },
+    });
 
-  return new NextResponse(stream, {
-    headers: {
-      "Content-Type": "text/event-stream",
-      "Cache-Control": "no-cache",
-      Connection: "keep-alive",
-    },
-  });
+    return new NextResponse(stream, {
+      headers: {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        Connection: "keep-alive",
+      },
+    });
+  } catch (error) {
+    console.error("Error creating readable stream or sending response:", error);
+    return new NextResponse("Internal server error", { status: 500 });
+  }
 }
