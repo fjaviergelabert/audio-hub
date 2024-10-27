@@ -16,13 +16,12 @@ export async function transcribe(
     const mp3Buffer = await downloadYoutube(url, onProgress);
     const wavBuffer = await convertMp3ToWav(mp3Buffer, onProgress);
 
+    onProgress({ type: "wav-processing", status: "started", progress: 0 });
     const wav = new WaveFile(wavBuffer);
     wav.toBitDepth("32f");
     wav.toSampleRate(16000);
     let audioData = wav.getSamples();
 
-    // WAV processing progress
-    onProgress({ type: "wav-processing", status: "started", progress: 0 });
     if (Array.isArray(audioData) && audioData.length > 1) {
       const SCALING_FACTOR = Math.sqrt(2);
       for (let i = 0; i < audioData[0].length; ++i) {

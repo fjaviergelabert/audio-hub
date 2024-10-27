@@ -152,44 +152,51 @@ export function TranscribePage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 py-12 px-4 sm:px-6 lg:px-8 flex">
-      <div className="flex-1 pr-8">
-        <Card className="max-w-md mx-auto">
-          <CardHeader>
-            <CardTitle className="text-2xl font-bold text-center">
+    <main className="min-h-screen bg-gray-100 py-12 px-4 sm:px-6 lg:px-8 flex">
+      <section className="flex-1 pr-8">
+        <article className="max-w-md mx-auto shadow-sm bg-white p-6 rounded-lg">
+          <header className="mb-4">
+            <h1 className="text-2xl font-bold text-center">
               YouTube Transcriber (Whisper AI)
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <Input
-                type="text"
-                value={url}
-                onChange={(e) => setUrl(e.target.value)}
-                placeholder="Enter YouTube URL"
-                required
-              />
-              <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Transcribing...
-                  </>
-                ) : (
-                  "Transcribe"
-                )}
-              </Button>
-            </form>
-            {error && <p className="mt-4 text-red-600">{error}</p>}
-            <div className="mt-6 space-y-4">
-              {progressSteps.map((step, index) => (
-                <Card
-                  key={index}
-                  className="transition-transform p-4 bg-white shadow-sm"
-                >
+            </h1>
+          </header>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <Input
+              type="text"
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              placeholder="Enter YouTube URL"
+              required
+            />
+            <Button type="submit" className="w-full" disabled={loading}>
+              {loading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Transcribing...
+                </>
+              ) : (
+                "Transcribe"
+              )}
+            </Button>
+          </form>
+          {error && <p className="mt-4 text-red-600">{error}</p>}
+          <ol className="mt-6 space-y-4">
+            {progressSteps.map((step, index) => (
+              <li key={index}>
+                <Card className="transition-transform bg-white shadow-sm">
                   <CardHeader>
                     <div className="flex items-center">
-                      <div
+                      <span
+                        role="status"
+                        aria-label={
+                          step.status === "completed"
+                            ? "Step completed"
+                            : step.status === "in-progress"
+                            ? "Step in progress"
+                            : step.status === "error"
+                            ? "Step error"
+                            : "Step idle"
+                        }
                         className={`flex justify-center items-center h-8 w-8 rounded-full text-white
                           ${step.status === "completed" ? "bg-green-500" : ""}
                           ${step.status === "in-progress" ? "bg-blue-500" : ""}
@@ -202,21 +209,17 @@ export function TranscribePage() {
                         )}
                         {step.status === "error" && <span>✖</span>}
                         {step.status === "idle" && <span>○</span>}
-                      </div>
+                      </span>
                       <CardTitle className="ml-4 text-lg font-semibold">
                         {step.message}
                       </CardTitle>
                     </div>
                   </CardHeader>
-                  <CardContent>
-                    <div className="mt-2">
+                  {step.status === "in-progress" && (
+                    <CardContent>
                       <div className="w-full bg-gray-200 rounded-full h-2.5">
                         <div
-                          className={`${
-                            step.status === "in-progress"
-                              ? "bg-blue-500"
-                              : "bg-gray-400"
-                          } h-2.5 rounded-full`}
+                          className={`${"bg-gray-400"} h-2.5 rounded-full`}
                           style={{
                             width: `${
                               step.progress > 100 ? 100 : step.progress
@@ -224,26 +227,26 @@ export function TranscribePage() {
                           }}
                         ></div>
                       </div>
-                    </div>
-                  </CardContent>
+                    </CardContent>
+                  )}
                 </Card>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-      <div className="flex-1 pl-8">
+              </li>
+            ))}
+          </ol>
+        </article>
+      </section>
+      <section className="flex-1 pl-8">
         {transcription && (
-          <div>
+          <article>
             <h2 className="text-lg font-semibold mb-2 text-center">
               Transcription
             </h2>
             <div className="border p-4 rounded shadow bg-white text-black">
               <p className="whitespace-pre-wrap">{transcription}</p>
             </div>
-          </div>
+          </article>
         )}
-      </div>
-    </div>
+      </section>
+    </main>
   );
 }
