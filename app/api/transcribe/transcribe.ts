@@ -15,28 +15,10 @@ export async function transcribe(
   try {
     const mp3Buffer = await downloadYoutube(url, onProgress);
     const wavBuffer = await convertMp3ToWav(mp3Buffer, onProgress);
+    onProgress({ type: "conversion", status: "completed", progress: 100 });
 
     onProgress({ type: "wav-processing", status: "started", progress: 0 });
-    const wav = new WaveFile(wavBuffer);
-    wav.toBitDepth("32f");
-    wav.toSampleRate(16000);
-    let audioData = wav.getSamples();
-
-    if (Array.isArray(audioData) && audioData.length > 1) {
-      const SCALING_FACTOR = Math.sqrt(2);
-      for (let i = 0; i < audioData[0].length; ++i) {
-        audioData[0][i] =
-          (SCALING_FACTOR * (audioData[0][i] + audioData[1][i])) / 2;
-        if (i % Math.floor(audioData[0].length / 100) === 0) {
-          onProgress({
-            type: "wav-processing",
-            status: "in-progress",
-            progress: Math.floor((i / audioData[0].length) * 100),
-          });
-        }
-      }
-      audioData = audioData[0];
-    }
+    const audioData = processWav(wavBuffer, onProgress);
     onProgress({ type: "wav-processing", status: "completed", progress: 100 });
 
     const transcriber = await PipelineSingleton.getInstance();
@@ -92,6 +74,33 @@ export async function transcribe(
   } catch (error) {
     throw error;
   }
+}
+
+function processWav(
+  wavBuffer: Buffer,
+  onProgress: (data: TranscriptionProgress) => void
+) {
+  const wav = new WaveFile(wavBuffer);
+  wav.toBitDepth("32f");
+  wav.toSampleRate(16000);
+  let audioData = wav.getSamples();
+
+  if (Array.isArray(audioData) && audioData.length > 1) {
+    const SCALING_FACTOR = Math.sqrt(2);
+    for (let i = 0; i < audioData[0].length; ++i) {
+      audioData[0][i] =
+        (SCALING_FACTOR * (audioData[0][i] + audioData[1][i])) / 2;
+      if (i % Math.floor(audioData[0].length / 100) === 0) {
+        onProgress({
+          type: "wav-processing",
+          status: "in-progress",
+          progress: Math.floor((i / audioData[0].length) * 100),
+        });
+      }
+    }
+    audioData = audioData[0];
+  }
+  return audioData;
 }
 
 async function downloadYoutube(
@@ -159,7 +168,6 @@ async function convertMp3ToWav(
     outputStream.on("data", (chunk) => chunks.push(chunk));
 
     outputStream.on("end", () => {
-      onProgress({ type: "conversion", status: "completed", progress: 100 });
       resolve(Buffer.concat(chunks));
     });
 

@@ -219,7 +219,7 @@ export function TranscribePage() {
                     <CardContent>
                       <div className="w-full bg-gray-200 rounded-full h-2.5">
                         <div
-                          className={`${"bg-gray-400"} h-2.5 rounded-full`}
+                          className={`${"bg-blue-400"} h-2.5 rounded-full`}
                           style={{
                             width: `${
                               step.progress > 100 ? 100 : step.progress
