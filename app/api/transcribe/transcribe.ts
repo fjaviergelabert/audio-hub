@@ -1,4 +1,5 @@
 import PipelineSingleton from "@/lib/pipeline";
+import { TranscriptionProgress } from "@/lib/types";
 import ytdl from "@distube/ytdl-core";
 import { path } from "@ffmpeg-installer/ffmpeg";
 import ffmpeg from "fluent-ffmpeg";
@@ -7,7 +8,10 @@ import { WaveFile } from "wavefile";
 
 ffmpeg.setFfmpegPath(path);
 
-export async function transcribe(url: string, onProgress: (data: any) => void) {
+export async function transcribe(
+  url: string,
+  onProgress: (data: TranscriptionProgress) => void
+) {
   try {
     const mp3Buffer = await downloadYoutube(url, onProgress);
     const wavBuffer = await convertMp3ToWav(mp3Buffer, onProgress);
@@ -93,7 +97,7 @@ export async function transcribe(url: string, onProgress: (data: any) => void) {
 
 async function downloadYoutube(
   url: string,
-  onProgress: (data: any) => void
+  onProgress: (data: TranscriptionProgress) => void
 ): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const dataChunks: Buffer[] = [];
@@ -127,7 +131,7 @@ async function downloadYoutube(
 
 async function convertMp3ToWav(
   mp3Buffer: Buffer,
-  onProgress: (data: any) => void
+  onProgress: (data: TranscriptionProgress) => void
 ): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const inputStream = new PassThrough();

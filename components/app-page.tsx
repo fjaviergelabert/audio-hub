@@ -3,6 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { TranscriptionProgress } from "@/lib/types";
 import { Loader2 } from "lucide-react";
 import React, { useState } from "react";
 
@@ -12,11 +13,48 @@ export function TranscribePage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
+  const [progressSteps, setProgressSteps] = useState<
+    (TranscriptionProgress & { message: string })[]
+  >([
+    {
+      type: "download",
+      progress: 0,
+      status: "idle",
+      message: "Download audio",
+    },
+    {
+      type: "conversion",
+      progress: 0,
+      status: "idle",
+      message: "Convert to WAV format",
+    },
+    {
+      type: "wav-processing",
+      progress: 0,
+      status: "idle",
+      message: "Process WAV data",
+    },
+    {
+      type: "transcription",
+      progress: 0,
+      status: "idle",
+      message: "Transcribe audio",
+    },
+  ]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError("");
     setTranscription("");
+
+    setProgressSteps(
+      progressSteps.map((step) => ({
+        ...step,
+        status: "idle",
+        progress: 0,
+      }))
+    );
 
     try {
       await startTranscription(url);
@@ -60,14 +98,9 @@ export function TranscribePage() {
                 .filter(Boolean)
                 .forEach((line) => {
                   try {
-                    const progressUpdate = JSON.parse(line);
-                    console.log("PROGRESS", progressUpdate);
-                    if (
-                      progressUpdate.type === "transcription" &&
-                      progressUpdate.data
-                    ) {
-                      setTranscription(progressUpdate.data);
-                    }
+                    const progressUpdate: TranscriptionProgress =
+                      JSON.parse(line);
+                    handleProgressUpdate(progressUpdate);
                   } catch (e) {
                     console.error("Error parsing progress update:", e);
                   }
@@ -99,43 +132,118 @@ export function TranscribePage() {
       });
   }
 
+  function handleProgressUpdate(progressUpdate: TranscriptionProgress) {
+    setProgressSteps((prevSteps) =>
+      prevSteps.map((step) => {
+        if (step.type === progressUpdate.type) {
+          return {
+            ...step,
+            progress: progressUpdate.progress,
+            status: progressUpdate.status,
+          };
+        }
+        return step;
+      })
+    );
+
+    if (progressUpdate.type === "transcription" && progressUpdate.data) {
+      setTranscription(progressUpdate.data);
+    }
+  }
+
   return (
-    <div className="min-h-screen bg-gray-100 py-12 px-4 sm:px-6 lg:px-8">
-      <Card className="max-w-md mx-auto">
-        <CardHeader>
-          <CardTitle className="text-2xl font-bold text-center">
-            YouTube Transcriber (Whisper AI)
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <Input
-              type="text"
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-              placeholder="Enter YouTube URL"
-              required
-            />
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Transcribing...
-                </>
-              ) : (
-                "Transcribe"
-              )}
-            </Button>
-          </form>
-          {error && <p className="mt-4 text-red-600">{error}</p>}
-          {transcription && (
-            <div className="mt-6">
-              <h2 className="text-lg font-semibold mb-2">Transcription:</h2>
+    <div className="min-h-screen bg-gray-100 py-12 px-4 sm:px-6 lg:px-8 flex">
+      <div className="flex-1 pr-8">
+        <Card className="max-w-md mx-auto">
+          <CardHeader>
+            <CardTitle className="text-2xl font-bold text-center">
+              YouTube Transcriber (Whisper AI)
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <Input
+                type="text"
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                placeholder="Enter YouTube URL"
+                required
+              />
+              <Button type="submit" className="w-full" disabled={loading}>
+                {loading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Transcribing...
+                  </>
+                ) : (
+                  "Transcribe"
+                )}
+              </Button>
+            </form>
+            {error && <p className="mt-4 text-red-600">{error}</p>}
+            <div className="mt-6 space-y-4">
+              {progressSteps.map((step, index) => (
+                <Card
+                  key={index}
+                  className="transition-transform p-4 bg-white shadow-sm"
+                >
+                  <CardHeader>
+                    <div className="flex items-center">
+                      <div
+                        className={`flex justify-center items-center h-8 w-8 rounded-full text-white
+                          ${step.status === "completed" ? "bg-green-500" : ""}
+                          ${step.status === "in-progress" ? "bg-blue-500" : ""}
+                          ${step.status === "error" ? "bg-red-500" : ""}
+                          ${step.status === "idle" ? "bg-gray-400" : ""}`}
+                      >
+                        {step.status === "completed" && <span>✔</span>}
+                        {step.status === "in-progress" && (
+                          <Loader2 className="animate-spin" />
+                        )}
+                        {step.status === "error" && <span>✖</span>}
+                        {step.status === "idle" && <span>○</span>}
+                      </div>
+                      <CardTitle className="ml-4 text-lg font-semibold">
+                        {step.message}
+                      </CardTitle>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="mt-2">
+                      <div className="w-full bg-gray-200 rounded-full h-2.5">
+                        <div
+                          className={`${
+                            step.status === "in-progress"
+                              ? "bg-blue-500"
+                              : "bg-gray-400"
+                          } h-2.5 rounded-full`}
+                          style={{
+                            width: `${
+                              step.progress > 100 ? 100 : step.progress
+                            }%`,
+                          }}
+                        ></div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+      <div className="flex-1 pl-8">
+        {transcription && (
+          <div>
+            <h2 className="text-lg font-semibold mb-2 text-center">
+              Transcription
+            </h2>
+            <div className="border p-4 rounded shadow bg-white text-black">
               <p className="whitespace-pre-wrap">{transcription}</p>
             </div>
-          )}
-        </CardContent>
-      </Card>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
