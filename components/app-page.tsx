@@ -6,10 +6,13 @@ import { Input } from "@/components/ui/input";
 import { TranscriptionProgress } from "@/lib/types";
 import { Loader2 } from "lucide-react";
 import React, { useState } from "react";
+import { TranscriptCards } from "./transcript-cards";
+
+export type Transcription = Array<{ timestamp: number; text: string }>;
 
 export function TranscribePage() {
   const [url, setUrl] = useState("");
-  const [transcription, setTranscription] = useState("");
+  const [transcription, setTranscription] = useState<Transcription>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -46,7 +49,7 @@ export function TranscribePage() {
     e.preventDefault();
     setLoading(true);
     setError("");
-    setTranscription("");
+    setTranscription([]);
 
     setProgressSteps(
       progressSteps.map((step) => ({
@@ -147,7 +150,27 @@ export function TranscribePage() {
     );
 
     if (progressUpdate.type === "transcription" && progressUpdate.data) {
-      setTranscription(progressUpdate.data);
+      const chunks = progressUpdate.data[1].chunks;
+      const chunk = chunks[chunks.length - 1];
+      const timestamp = chunk?.timestamp[0] || 0;
+      const text = chunk?.text || "";
+      setTranscription((prevTranscription) => {
+        const prevChunk = prevTranscription[prevTranscription.length - 1] || {
+          timestamp: 0,
+          text: "",
+        };
+
+        if (timestamp === prevChunk.timestamp && text === prevChunk.text) {
+          return prevTranscription;
+        }
+
+        if (timestamp === prevChunk.timestamp) {
+          return [...prevTranscription.slice(0, -1), { timestamp, text }];
+        }
+
+        return [...prevTranscription, { timestamp, text: chunk?.text }];
+      });
+      console.log("data[1]", progressUpdate.data[1]);
     }
   }
 
@@ -235,15 +258,10 @@ export function TranscribePage() {
           </ol>
         </article>
       </section>
-      {transcription && (
+      {transcription.length > 0 && (
         <section className="flex-1 pl-8">
           <article>
-            <h2 className="text-lg font-semibold mb-2 text-center">
-              Transcription
-            </h2>
-            <div className="border p-4 rounded shadow bg-white text-black">
-              <p className="whitespace-pre-wrap">{transcription}</p>
-            </div>
+            <TranscriptCards chunks={transcription} />
           </article>
         </section>
       )}

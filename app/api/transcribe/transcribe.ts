@@ -60,11 +60,10 @@ export async function transcribe(
           force_full_sequences: false,
         });
 
-        onProgress(data[0]);
         onProgress({
           type: "transcription",
           status: "in-progress",
-          data: data[0],
+          data: data,
           progress: Math.floor((processedChunks / totalChunks) * 100),
         });
       },
