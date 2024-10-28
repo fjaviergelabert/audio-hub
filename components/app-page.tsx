@@ -235,8 +235,8 @@ export function TranscribePage() {
           </ol>
         </article>
       </section>
-      <section className="flex-1 pl-8">
-        {transcription && (
+      {transcription && (
+        <section className="flex-1 pl-8">
           <article>
             <h2 className="text-lg font-semibold mb-2 text-center">
               Transcription
@@ -245,8 +245,8 @@ export function TranscribePage() {
               <p className="whitespace-pre-wrap">{transcription}</p>
             </div>
           </article>
-        )}
-      </section>
+        </section>
+      )}
     </main>
   );
 }
