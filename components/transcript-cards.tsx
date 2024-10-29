@@ -2,10 +2,10 @@
 
 import { Card, CardContent } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { TranscriptionChunk } from "@/lib/types";
 import { useEffect, useRef } from "react";
-import { Transcription } from "./app-page";
 
-export function TranscriptCards({ chunks }: { chunks: Transcription }) {
+export function TranscriptCards({ chunks }: { chunks: TranscriptionChunk[] }) {
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const lastEntryRef = useRef<HTMLDivElement>(null);
 
@@ -37,20 +37,21 @@ export function TranscriptCards({ chunks }: { chunks: Transcription }) {
   }
 
   return (
-    <Card className="w-full max-w-3xl mx-auto">
-      <CardContent className="p-6">
-        <h2 className="text-2xl font-bold mb-4 text-gray-800 dark:text-gray-200">
-          Transcript
-        </h2>
-        <ScrollArea ref={scrollAreaRef} className="h-[500px] pr-4">
-          {chunks.map((entry, index) => (
+    <>
+      <h2 className="text-2xl font-bold mb-4 text-gray-800 dark:text-gray-200">
+        Transcript
+      </h2>
+      <ScrollArea ref={scrollAreaRef} className="h-[500px] pr-4">
+        {chunks.map((entry, index) => {
+          const timestamp = `${formatTime(entry.timestamp[0] || 0)}`;
+          return (
             <div
-              key={entry.timestamp}
+              key={index}
               className="flex mb-4 last:mb-0 animate-fadeIn"
               ref={index === chunks.length - 1 ? lastEntryRef : null}
             >
               <div className="flex-shrink-0 w-24 pr-4 text-right text-base font-semibold text-gray-500 dark:text-gray-400">
-                {formatTime(entry.timestamp)}
+                {timestamp}
               </div>
               <Card className="flex-grow">
                 <CardContent className="p-3">
@@ -58,9 +59,9 @@ export function TranscriptCards({ chunks }: { chunks: Transcription }) {
                 </CardContent>
               </Card>
             </div>
-          ))}
-        </ScrollArea>
-      </CardContent>
-    </Card>
+          );
+        })}
+      </ScrollArea>
+    </>
   );
 }

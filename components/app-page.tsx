@@ -3,16 +3,14 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { TranscriptionProgress } from "@/lib/types";
+import { TranscriptionChunk, TranscriptionProgress } from "@/lib/types";
 import { Loader2 } from "lucide-react";
 import React, { useState } from "react";
 import { TranscriptCards } from "./transcript-cards";
 
-export type Transcription = Array<{ timestamp: number; text: string }>;
-
 export function TranscribePage() {
   const [url, setUrl] = useState("");
-  const [transcription, setTranscription] = useState<Transcription>([]);
+  const [transcription, setTranscription] = useState<TranscriptionChunk[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -150,33 +148,22 @@ export function TranscribePage() {
     );
 
     if (progressUpdate.type === "transcription" && progressUpdate.data) {
+      console.log("progressUpdate.data", progressUpdate.data);
       const chunks = progressUpdate.data[1].chunks;
       const chunk = chunks[chunks.length - 1];
-      const timestamp = chunk?.timestamp[0] || 0;
-      const text = chunk?.text || "";
-      setTranscription((prevTranscription) => {
-        const prevChunk = prevTranscription[prevTranscription.length - 1] || {
-          timestamp: 0,
-          text: "",
-        };
+      const timestamp = chunk?.timestamp[0];
 
-        if (timestamp === prevChunk.timestamp && text === prevChunk.text) {
-          return prevTranscription;
-        }
+      if (typeof timestamp !== "number") {
+        return;
+      }
 
-        if (timestamp === prevChunk.timestamp) {
-          return [...prevTranscription.slice(0, -1), { timestamp, text }];
-        }
-
-        return [...prevTranscription, { timestamp, text: chunk?.text }];
-      });
-      console.log("data[1]", progressUpdate.data[1]);
+      setTranscription(chunks);
     }
   }
 
   return (
-    <main className="min-h-screen bg-gray-100 py-12 px-4 sm:px-6 lg:px-8 flex">
-      <section className="flex-1 pr-8">
+    <main className="min-h-screen bg-gray-100 py-12 px-4 sm:px-6 lg:px-8 flex gap">
+      <section className="flex-1">
         <article className="max-w-md mx-auto shadow-sm bg-white p-6 rounded-lg">
           <header className="mb-4">
             <h1 className="text-2xl font-bold text-center">
@@ -259,8 +246,8 @@ export function TranscribePage() {
         </article>
       </section>
       {transcription.length > 0 && (
-        <section className="flex-1 pl-8">
-          <article>
+        <section className="flex-1">
+          <article className="max-w-3xl mx-auto shadow-sm bg-white p-6 rounded-lg">
             <TranscriptCards chunks={transcription} />
           </article>
         </section>
