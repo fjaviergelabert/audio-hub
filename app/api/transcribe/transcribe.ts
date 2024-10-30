@@ -15,11 +15,8 @@ export async function transcribe(
   try {
     const mp3Buffer = await downloadYoutube(url, onProgress);
     const wavBuffer = await convertMp3ToWav(mp3Buffer, onProgress);
-    onProgress({ type: "conversion", status: "completed", progress: 100 });
 
-    onProgress({ type: "wav-processing", status: "started", progress: 0 });
     const audioData = processWav(wavBuffer, onProgress);
-    onProgress({ type: "wav-processing", status: "completed", progress: 100 });
 
     const transcriber = await PipelineSingleton.getInstance();
 
@@ -79,6 +76,8 @@ function processWav(
   wavBuffer: Buffer,
   onProgress: (data: TranscriptionProgress) => void
 ) {
+  onProgress({ type: "wav-processing", status: "started", progress: 0 });
+
   const wav = new WaveFile(wavBuffer);
   wav.toBitDepth("32f");
   wav.toSampleRate(16000);
@@ -99,6 +98,8 @@ function processWav(
     }
     audioData = audioData[0];
   }
+  onProgress({ type: "wav-processing", status: "completed", progress: 100 });
+
   return audioData;
 }
 
@@ -135,7 +136,6 @@ async function downloadYoutube(
     audioStream.on("error", reject);
   });
 }
-
 async function convertMp3ToWav(
   mp3Buffer: Buffer,
   onProgress: (data: TranscriptionProgress) => void
@@ -144,32 +144,45 @@ async function convertMp3ToWav(
     const inputStream = new PassThrough();
     const outputStream = new PassThrough();
     const chunks: Buffer[] = [];
-    let processedSize = 0;
-
     inputStream.end(mp3Buffer);
+
+    let estimatedDuration = 0;
+    let processedTime = 0;
 
     ffmpeg(inputStream)
       .toFormat("wav")
+      .on("codecData", (data) => {
+        // Retrieve the duration once conversion starts
+        const durationParts = data.duration.split(":").map(Number);
+        estimatedDuration =
+          durationParts[0] * 3600 + durationParts[1] * 60 + durationParts[2]; // Convert to seconds
+      })
       .on("progress", (progress) => {
-        processedSize =
-          progress.frames && mp3Buffer.length
-            ? Math.floor((progress.frames / mp3Buffer.length) * 100)
-            : processedSize;
+        const timeParts = progress.timemark.split(":").map(Number);
+        processedTime = timeParts[0] * 3600 + timeParts[1] * 60 + timeParts[2]; // Convert to seconds
+
+        const progressPercentage = estimatedDuration
+          ? Math.floor((processedTime / estimatedDuration) * 100)
+          : 0;
+
         onProgress({
           type: "conversion",
           status: "in-progress",
-          progress: processedSize,
+          progress: progressPercentage,
         });
       })
-      .on("error", (err) => reject(err))
-      .pipe(outputStream);
+      .pipe(outputStream, { end: true })
+      .on("end", () => {
+        onProgress({ type: "conversion", status: "completed", progress: 100 });
+      })
+      .on("error", (err) => {
+        reject(err);
+      });
 
     outputStream.on("data", (chunk) => chunks.push(chunk));
-
     outputStream.on("end", () => {
       resolve(Buffer.concat(chunks));
     });
-
     outputStream.on("error", reject);
   });
 }
