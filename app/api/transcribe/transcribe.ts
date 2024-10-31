@@ -15,6 +15,7 @@ export async function transcribe(
   try {
     const mp3Buffer = await downloadYoutube(url, onProgress);
     const wavBuffer = await convertMp3ToWav(mp3Buffer, onProgress);
+    onProgress({ type: "conversion", status: "completed", progress: 100 });
 
     const audioData = processWav(wavBuffer, onProgress);
 
@@ -172,9 +173,7 @@ async function convertMp3ToWav(
         });
       })
       .pipe(outputStream, { end: true })
-      .on("end", () => {
-        onProgress({ type: "conversion", status: "completed", progress: 100 });
-      })
+      .on("end", () => {})
       .on("error", (err) => {
         reject(err);
       });

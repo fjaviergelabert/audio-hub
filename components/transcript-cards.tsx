@@ -37,31 +37,26 @@ export function TranscriptCards({ chunks }: { chunks: TranscriptionChunk[] }) {
   }
 
   return (
-    <>
-      <h2 className="text-2xl font-bold mb-4 text-gray-800 dark:text-gray-200">
-        Transcript
-      </h2>
-      <ScrollArea ref={scrollAreaRef} className="h-[500px] pr-4">
-        {chunks.map((entry, index) => {
-          const timestamp = `${formatTime(entry.timestamp[0] || 0)}`;
-          return (
-            <div
-              key={index}
-              className="flex mb-4 last:mb-0 animate-fadeIn flex-col md:flex-row"
-              ref={index === chunks.length - 1 ? lastEntryRef : null}
-            >
-              <div className="flex-shrink-0 w-full md:w-24 pr-4 text-right text-base font-semibold text-gray-500 dark:text-gray-400">
-                {timestamp}
-              </div>
-              <Card className="flex-grow w-full">
-                <CardContent className="p-3">
-                  <p className="text-sm md:text-base">{entry.text}</p>
-                </CardContent>
-              </Card>
+    <ScrollArea ref={scrollAreaRef} className="h-[500px] pr-4">
+      {chunks.map((entry, index) => {
+        const timestamp = `${formatTime(entry.timestamp[0] || 0)}`;
+        return (
+          <div
+            key={index}
+            className="flex mb-4 last:mb-0 animate-fadeIn flex-col md:flex-row"
+            ref={index === chunks.length - 1 ? lastEntryRef : null}
+          >
+            <div className="flex-shrink-0 w-full md:w-24 pr-4 text-right text-base font-semibold text-gray-500 dark:text-gray-400">
+              {timestamp}
             </div>
-          );
-        })}
-      </ScrollArea>
-    </>
+            <Card className="flex-grow w-full">
+              <CardContent className="p-3">
+                <p className="text-sm md:text-base">{entry.text}</p>
+              </CardContent>
+            </Card>
+          </div>
+        );
+      })}
+    </ScrollArea>
   );
 }
