@@ -52,8 +52,8 @@ export function TranscribePage() {
 
   return (
     <main className="min-h-screen bg-gray-100 py-6 px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row gap-4">
-      <section className="flex-1 mb-4 md:mb-0">
-        <article className="max-w-md mx-auto shadow-sm bg-white p-6 rounded-lg flex flex-col md:flex-row">
+      <section className="flex-1">
+        <article className="max-w-md mx-auto shadow-sm bg-white p-6 rounded-lg">
           <header className="mb-4">
             <h1 className="text-2xl font-bold text-center">
               YouTube Transcriber (Whisper AI)
