@@ -162,8 +162,8 @@ export function TranscribePage() {
   }
 
   return (
-    <main className="min-h-screen bg-gray-100 py-12 px-4 sm:px-6 lg:px-8 flex gap">
-      <section className="flex-1">
+    <main className="min-h-screen bg-gray-100 py-6 px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row gap-4">
+      <section className="flex-1 mb-4 md:mb-0">
         <article className="max-w-md mx-auto shadow-sm bg-white p-6 rounded-lg">
           <header className="mb-4">
             <h1 className="text-2xl font-bold text-center">
@@ -177,6 +177,7 @@ export function TranscribePage() {
               onChange={(e) => setUrl(e.target.value)}
               placeholder="Enter YouTube URL"
               required
+              className="w-full" // Ensure the input takes full width on mobile
             />
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? (
@@ -229,7 +230,7 @@ export function TranscribePage() {
                     <CardContent>
                       <div className="w-full bg-gray-200 rounded-full h-2.5">
                         <div
-                          className={`${"bg-blue-400"} h-2.5 rounded-full`}
+                          className="bg-blue-400 h-2.5 rounded-full"
                           style={{
                             width: `${
                               step.progress > 100 ? 100 : step.progress

@@ -47,15 +47,15 @@ export function TranscriptCards({ chunks }: { chunks: TranscriptionChunk[] }) {
           return (
             <div
               key={index}
-              className="flex mb-4 last:mb-0 animate-fadeIn"
+              className="flex mb-4 last:mb-0 animate-fadeIn flex-col md:flex-row"
               ref={index === chunks.length - 1 ? lastEntryRef : null}
             >
-              <div className="flex-shrink-0 w-24 pr-4 text-right text-base font-semibold text-gray-500 dark:text-gray-400">
+              <div className="flex-shrink-0 w-full md:w-24 pr-4 text-right text-base font-semibold text-gray-500 dark:text-gray-400">
                 {timestamp}
               </div>
-              <Card className="flex-grow">
+              <Card className="flex-grow w-full">
                 <CardContent className="p-3">
-                  <p>{entry.text}</p>
+                  <p className="text-sm md:text-base">{entry.text}</p>
                 </CardContent>
               </Card>
             </div>
