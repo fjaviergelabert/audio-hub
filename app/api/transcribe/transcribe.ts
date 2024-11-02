@@ -147,36 +147,20 @@ async function convertMp3ToWav(
     const chunks: Buffer[] = [];
     inputStream.end(mp3Buffer);
 
-    let estimatedDuration = 0;
-    let processedTime = 0;
-
     ffmpeg(inputStream)
       .toFormat("wav")
-      .on("codecData", (data) => {
-        // Retrieve the duration once conversion starts
-        const durationParts = data.duration.split(":").map(Number);
-        estimatedDuration =
-          durationParts[0] * 3600 + durationParts[1] * 60 + durationParts[2]; // Convert to seconds
-      })
       .on("progress", (progress) => {
-        const timeParts = progress.timemark.split(":").map(Number);
-        processedTime = timeParts[0] * 3600 + timeParts[1] * 60 + timeParts[2]; // Convert to seconds
-
-        const progressPercentage = estimatedDuration
-          ? Math.floor((processedTime / estimatedDuration) * 100)
-          : 0;
-
         onProgress({
           type: "conversion",
           status: "in-progress",
-          progress: progressPercentage,
+          progress: progress.percent || 0,
         });
       })
-      .pipe(outputStream, { end: true })
       .on("end", () => {})
       .on("error", (err) => {
         reject(err);
-      });
+      })
+      .pipe(outputStream);
 
     outputStream.on("data", (chunk) => chunks.push(chunk));
     outputStream.on("end", () => {
