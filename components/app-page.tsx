@@ -8,6 +8,7 @@ import { Loader2 } from "lucide-react";
 import React, { useState } from "react";
 import { TranscriptCards } from "./transcript-cards";
 
+// TODO: MAkle this below a key value paired object
 const INITIAL_PROGRESS_STEPS: Array<
   TranscriptionProgress & { message: string }
 > = [
@@ -45,8 +46,10 @@ export function TranscribePage() {
   const progressState = useProgressSteps({
     onTranscriptionUpdate: setTranscription,
   });
-  const transcriptionState = useTranscription({
-    onProgress: progressState.handleProgressUpdate,
+  const { startStreamDownload } = useReader({
+    url: "/api/transcribe",
+    body: { url },
+    onStream: progressState.handleProgressUpdate,
     setLoading,
   });
 
@@ -75,7 +78,7 @@ export function TranscribePage() {
               );
 
               try {
-                await transcriptionState.startTranscription(url);
+                await startStreamDownload();
               } catch (error) {
                 setError("An error occurred during transcription: " + error);
                 setLoading(false);
@@ -87,6 +90,9 @@ export function TranscribePage() {
           />
           {error && <p className="mt-4 text-red-600">{error}</p>}
           <ProgressSteps progressSteps={progressState.progressSteps} />
+          <div className="mt-6 flex justify-end">
+            <DownloadButton url={url} transcription={transcription} />
+          </div>
         </article>
       </section>
       {transcription.length > 0 && (
@@ -198,18 +204,71 @@ function URLInput({
   );
 }
 
-function useTranscription({
-  onProgress,
-  setLoading,
+function useProgressSteps({
+  onTranscriptionUpdate,
 }: {
-  setLoading: React.Dispatch<React.SetStateAction<boolean>>;
-  onProgress: (data: TranscriptionProgress) => void;
+  onTranscriptionUpdate: (chunks: TranscriptionChunk[]) => void;
 }) {
-  async function startTranscription(url: string) {
-    const response = await fetch("/api/transcribe", {
+  const [progressSteps, setProgressSteps] = useState(INITIAL_PROGRESS_STEPS);
+
+  function handleProgressUpdate(serverProgress: Uint8Array) {
+    const data = new TextDecoder("utf-8").decode(serverProgress);
+    const handleLine = (line: string): void => {
+      try {
+        const progressUpdate = JSON.parse(line);
+
+        setProgressSteps((prevSteps) =>
+          prevSteps.map((step) => {
+            if (step.type === progressUpdate.type) {
+              return {
+                ...step,
+                progress: progressUpdate.progress,
+                status: progressUpdate.status,
+              };
+            }
+            return step;
+          })
+        );
+
+        if (progressUpdate.type === "transcription" && progressUpdate.data) {
+          const chunks = progressUpdate.data[1].chunks;
+          const chunk = chunks[chunks.length - 1];
+          const timestamp = chunk?.timestamp[0];
+
+          if (typeof timestamp !== "number") {
+            return;
+          }
+
+          onTranscriptionUpdate(chunks);
+        }
+      } catch (e) {
+        console.error("Error parsing progress update:", e);
+      }
+    };
+
+    data.split("\n").filter(Boolean).forEach(handleLine);
+  }
+  return { progressSteps, setProgressSteps, handleProgressUpdate };
+}
+
+function useReader({
+  url,
+  body,
+  onStream,
+  setLoading,
+  onDone = () => {},
+}: {
+  url: string;
+  body: any;
+  setLoading: React.Dispatch<React.SetStateAction<boolean>>;
+  onStream: (data: Uint8Array) => void;
+  onDone?: () => void;
+}) {
+  async function startStreamDownload() {
+    const response = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ url }),
+      body: JSON.stringify(body),
     });
 
     if (!response.ok) {
@@ -219,9 +278,8 @@ function useTranscription({
     }
 
     const reader = response.body!.getReader();
-    const decoder = new TextDecoder("utf-8");
 
-    const stream = createStream(reader, decoder);
+    const stream = createStream(reader);
 
     new Response(stream)
       .text()
@@ -234,10 +292,7 @@ function useTranscription({
       });
   }
 
-  function createStream(
-    reader: ReadableStreamDefaultReader<Uint8Array>,
-    decoder: TextDecoder
-  ) {
+  function createStream(reader: ReadableStreamDefaultReader<Uint8Array>) {
     return new ReadableStream({
       start(controller) {
         push();
@@ -257,22 +312,13 @@ function useTranscription({
             value,
           }: ReadableStreamReadResult<Uint8Array>): void {
             if (done) {
+              onDone();
               controller.close();
               setLoading(false);
               return;
             }
 
-            const data = decoder.decode(value, { stream: true });
-            data
-              .split("\n")
-              .filter(Boolean)
-              .forEach((line) => {
-                try {
-                  onProgress(JSON.parse(line));
-                } catch (e) {
-                  console.error("Error parsing progress update:", e);
-                }
-              });
+            onStream(value);
 
             controller.enqueue(value);
             push();
@@ -282,41 +328,58 @@ function useTranscription({
     });
   }
 
-  return { startTranscription };
+  return { startStreamDownload };
 }
 
-function useProgressSteps({
-  onTranscriptionUpdate,
+function DownloadButton({
+  url,
+  transcription,
 }: {
-  onTranscriptionUpdate: (chunks: TranscriptionChunk[]) => void;
+  url: string;
+  transcription: TranscriptionChunk[];
 }) {
-  const [progressSteps, setProgressSteps] = useState(INITIAL_PROGRESS_STEPS);
+  const [isLoading, setIsLoading] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [chunks, setChunks] = useState<BlobPart[]>([]);
+  const [error, setError] = useState("");
 
-  function handleProgressUpdate(progressUpdate: TranscriptionProgress) {
-    setProgressSteps((prevSteps) =>
-      prevSteps.map((step) => {
-        if (step.type === progressUpdate.type) {
-          return {
-            ...step,
-            progress: progressUpdate.progress,
-            status: progressUpdate.status,
-          };
-        }
-        return step;
-      })
-    );
+  const { startStreamDownload } = useReader({
+    url: "/api/download-subtitled-video",
+    body: { url, transcription },
+    onStream: (progressUpdate) => {
+      console.log("progressUpdate", progressUpdate);
+      setChunks((prevChunks) => [...prevChunks, progressUpdate]);
+    },
+    onDone: () => {
+      setIsLoading(false);
+      const videoBlob = new Blob(chunks, { type: "video/mp4" });
+      const videoURL = URL.createObjectURL(videoBlob);
+      const a = document.createElement("a");
+      a.href = videoURL;
+      a.download = "video.mp4";
+      document.body.appendChild(a);
+      a.click();
+      URL.revokeObjectURL(videoURL);
+    },
+    setLoading: setIsLoading,
+  });
 
-    if (progressUpdate.type === "transcription" && progressUpdate.data) {
-      const chunks = progressUpdate.data[1].chunks;
-      const chunk = chunks[chunks.length - 1];
-      const timestamp = chunk?.timestamp[0];
+  const handleDownload = async () => {
+    setIsLoading(true);
+    setProgress(0);
+    setError("");
+    setChunks([]);
 
-      if (typeof timestamp !== "number") {
-        return;
-      }
+    startStreamDownload();
+  };
 
-      onTranscriptionUpdate(chunks);
-    }
-  }
-  return { progressSteps, setProgressSteps, handleProgressUpdate };
+  return (
+    <>
+      <Button onClick={handleDownload} className="mr-2" disabled={isLoading}>
+        {isLoading ? "Downloading..." : "Download Video"}
+      </Button>
+      {progress > 0 && <p>Progress: {progress}%</p>}
+      {error && <p style={{ color: "red" }}>{error}</p>}
+    </>
+  );
 }

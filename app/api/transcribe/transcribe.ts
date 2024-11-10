@@ -13,8 +13,10 @@ export async function transcribe(
   onProgress: (data: TranscriptionProgress) => void
 ) {
   try {
-    const mp3Buffer = await downloadYoutube(url, onProgress);
-    const wavBuffer = await convertMp3ToWav(mp3Buffer, onProgress);
+    const mp3Buffer = await downloadYoutube(url, onProgress, {
+      filter: "audioonly",
+    });
+    const wavBuffer = await convertFile(mp3Buffer, onProgress, () => {}, "wav");
     onProgress({ type: "conversion", status: "completed", progress: 100 });
 
     const audioData = processWav(wavBuffer, onProgress);
@@ -104,51 +106,55 @@ function processWav(
   return audioData;
 }
 
-async function downloadYoutube(
+export async function downloadYoutube(
   url: string,
-  onProgress: (data: TranscriptionProgress) => void
+  onProgress: (data: TranscriptionProgress) => void,
+  filter: ytdl.downloadOptions
 ): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const dataChunks: Buffer[] = [];
-    const audioStream = ytdl(url, { filter: "audioonly" });
+    const stream = ytdl(url, filter);
 
     let totalSize = 0;
     let downloadedSize = 0;
 
-    audioStream.on("info", (info) => {
+    stream.on("info", (info) => {
       totalSize = info.player_response.videoDetails.lengthSeconds * 128 * 1024; // Rough estimate of file size
     });
 
-    audioStream.on("data", (chunk) => {
+    stream.on("data", (chunk) => {
       dataChunks.push(chunk);
       downloadedSize += chunk.length;
       onProgress({
         type: "download",
         status: "in-progress",
         progress: Math.floor((downloadedSize / totalSize) * 100),
+        data: chunk,
       });
     });
 
-    audioStream.on("end", () => {
+    stream.on("end", () => {
       onProgress({ type: "download", status: "completed", progress: 100 });
       resolve(Buffer.concat(dataChunks));
     });
 
-    audioStream.on("error", reject);
+    stream.on("error", reject);
   });
 }
-async function convertMp3ToWav(
-  mp3Buffer: Buffer,
-  onProgress: (data: TranscriptionProgress) => void
+export async function convertFile(
+  buffer: Buffer,
+  onProgress: (data: TranscriptionProgress) => void,
+  onData: (data: Buffer) => void,
+  format: string
 ): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const inputStream = new PassThrough();
     const outputStream = new PassThrough();
     const chunks: Buffer[] = [];
-    inputStream.end(mp3Buffer);
+    inputStream.end(buffer);
 
     ffmpeg(inputStream)
-      .toFormat("wav")
+      .toFormat(format)
       .on("progress", (progress) => {
         onProgress({
           type: "conversion",
@@ -162,7 +168,10 @@ async function convertMp3ToWav(
       })
       .pipe(outputStream);
 
-    outputStream.on("data", (chunk) => chunks.push(chunk));
+    outputStream.on("data", (chunk) => {
+      onData(chunk);
+      return chunks.push(chunk);
+    });
     outputStream.on("end", () => {
       resolve(Buffer.concat(chunks));
     });
