@@ -50,16 +50,12 @@ export async function POST(req: NextRequest) {
         return new Promise<void>((resolve, reject) => {
           ffmpeg()
             .input(tempVideoPath)
-            .outputOptions("-vf", `subtitles=${subtitlesPath}`) // Hardcode subtitles
-            .outputOptions(
-              "-c:v",
-              "libx264", // Video codec
-              "-c:a",
-              "aac" // Audio codec
-            )
+            .input(subtitlesPath) // Input subtitles file
+            .inputFormat("srt") // Specify the input format
+            .outputOptions("-c:v", "libx264", "-c:a", "aac", "-c:s", "mov_text") // Encoding options
             .output(tempOutputPath)
             .on("end", () => {
-              resolve();
+              resolve(); // Resolve the ffmpeg promise
             })
             .on("error", (err) => {
               console.error("Error processing video:", err);
@@ -67,7 +63,7 @@ export async function POST(req: NextRequest) {
                 new NextResponse("Internal server error", { status: 500 })
               );
             })
-            .run();
+            .run(); // Start the ffmpeg process
         });
       })
       .catch((err) => {
@@ -77,6 +73,7 @@ export async function POST(req: NextRequest) {
 
     const videoStream = createReadStream(tempOutputPath);
     videoStream.on("close", () => {
+      console.log("VIDEO CLOSE.", subtitlesPath);
       unlinkSync(tempVideoPath);
       unlinkSync(subtitlesPath);
       unlinkSync(tempOutputPath);
