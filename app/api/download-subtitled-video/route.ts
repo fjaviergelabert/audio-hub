@@ -19,16 +19,9 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const dataChunks: Buffer[] = [];
     const stream = ytdl(url, {
       filter: (format) => format.container === "mp4",
-    })
-      .on("data", (chunk) => {
-        dataChunks.push(chunk);
-      })
-      .on("end", () => {
-        Buffer.concat(dataChunks);
-      });
+    });
 
     return new NextResponse(stream, {
       headers: {
