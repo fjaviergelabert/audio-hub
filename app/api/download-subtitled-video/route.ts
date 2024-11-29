@@ -100,7 +100,7 @@ export async function POST(req: NextRequest) {
  * @param chunks - Array of TranscriptionChunk objects
  * @returns A string in SRT format
  */
-export function generateSubtitles(chunks: TranscriptionChunk[]): string {
+function generateSubtitles(chunks: TranscriptionChunk[]): string {
   // Helper function to convert seconds to SRT timestamp format
   const formatTimestamp = (seconds: number | null): string => {
     if (seconds === null) return "00:00:00,000";
