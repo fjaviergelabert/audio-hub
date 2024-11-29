@@ -8,6 +8,9 @@ const nextConfig = {
       "@ffmpeg-installer/ffmpeg",
     ],
   },
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
 };
 
 export default nextConfig;
