@@ -14,14 +14,7 @@ Audio Hub is a web application that allows users to transcribe YouTube videos us
 
 ## Installation
 
-1. Clone the repository:
-
-   ```sh
-   git clone https://github.com/yourusername/audio-hub.git
-   cd audio-hub
-   ```
-
-2. Install the dependencies:
+1. Install the dependencies:
 
    ```sh
    npm install
